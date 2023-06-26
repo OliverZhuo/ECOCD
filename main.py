@@ -106,7 +106,7 @@ def nmf(A, k, max_iter):
 
 
 def EC():
-    W, H, norms = nmf(A, k, 300)
+    W, H, norms = nmf(A, k, 500)
 
     now_communities = list([] for i in range(k))
     i_max = [0 for j in range(len(W))]
