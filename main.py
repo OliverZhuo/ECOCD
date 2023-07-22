@@ -1,12 +1,10 @@
 import copy
 import math
 import random
-import scipy as sp
 import numpy as np
 import pandas as pd
 from igraph import *
 import networkx as nx
-from scipy import stats
 
 
 def load_community_membership(name_of_ground_truth):
@@ -128,14 +126,7 @@ def EC():
         now_communities = expansionWithContraction(G_igraph, neighbors, now_communities,
                                                    core_communities, W)
 
-        now_communities_length = 0
-        for i in range(len(now_communities)):
-            now_communities_length += len(now_communities[i])
 
-        d = round(now_communities_length / core_communities_length, 3)
-
-        onmi_value = evaluation(now_communities, ground_truth_community)
-        print(onmi_value)
 
 
 def expansionWithContraction(G_igraph, neighbors, now_communities, core_communities, W):
@@ -257,140 +248,6 @@ def compute_permanence(G, community, neighbors, community_structure):
         nodes_permanence[i][1] = round(permanence, 4)
     return nodes_permanence
 
-
-def evaluation(pioneering_community, ground_truth_community):
-    for i in range(len(pioneering_community)):
-        pioneering_community[i] = set(pioneering_community[i])
-
-    for i in range(len(ground_truth_community)):
-        ground_truth_community[i] = set(ground_truth_community[i])
-
-    onmi_value = onmi(pioneering_community, ground_truth_community, allNodes=None,
-                      variant="MGH")
-
-    for i in range(len(pioneering_community)):
-        pioneering_community[i] = list(pioneering_community[i])
-
-    return onmi_value
-
-
-"""
-Author: Remy Cazabet (remy.cazabet AT gmail.com)
-"""
-
-logBase = 2
-
-
-def __partial_entropy_a_proba(proba):
-    if proba == 0:
-        return 0
-    return -proba * math.log(proba, logBase)
-
-
-def __cover_entropy(cover, allNodes):
-    allEntr = []
-    for com in cover:
-        fractionIn = len(com) / len(allNodes)
-        allEntr.append(sp.stats.entropy([fractionIn, 1 - fractionIn], base=logBase))
-
-    return sum(allEntr)
-
-
-def __com_pair_conditional_entropy(cl, clKnown, allNodes):
-    nbNodes = len(allNodes)
-
-    a = len((allNodes - cl) - clKnown) / nbNodes
-    b = len(clKnown - cl) / nbNodes
-    c = len(cl - clKnown) / nbNodes
-    d = len(cl & clKnown) / nbNodes
-
-    if __partial_entropy_a_proba(a) + __partial_entropy_a_proba(d) > __partial_entropy_a_proba(
-            b) + __partial_entropy_a_proba(c):
-        entropyKnown = stats.entropy([len(clKnown) / nbNodes, 1 - len(clKnown) / nbNodes], base=logBase)
-        conditionalEntropy = stats.entropy([a, b, c, d], base=logBase) - entropyKnown
-    else:
-        conditionalEntropy = stats.entropy([len(cl) / nbNodes, 1 - len(cl) / nbNodes], base=logBase)
-
-    return conditionalEntropy
-
-
-def __cover_conditional_entropy(cover, coverRef, allNodes, normalized=False):  # cover and coverRef and list of set
-    X = cover
-    Y = coverRef
-    allMatches = []
-    for com in cover:
-        matches = [(com2, __com_pair_conditional_entropy(com, com2, allNodes)) for com2 in coverRef]
-        bestMatch = min(matches, key=lambda c: c[1])
-        HXY_part = bestMatch[1]
-        if normalized:
-            HX = __partial_entropy_a_proba(len(com) / len(allNodes)) + __partial_entropy_a_proba(
-                (len(allNodes) - len(com)) / len(allNodes))
-            if HX == 0:
-                HXY_part = 1
-            else:
-                HXY_part = HXY_part / HX
-        allMatches.append(HXY_part)
-    to_return = sum(allMatches)
-    if normalized:
-        to_return = to_return / len(cover)
-    return to_return
-
-
-def onmi(cover, coverRef, allNodes=None,
-         variant="MGH_LFK"):  # cover and coverRef should be list of set, no community ID
-    """
-    Compute Overlapping NMI
-
-    This implementation allows to compute 3 versions of the overlapping NMI
-    LFK: The original implementation proposed by Lacichinetti et al.(1). The normalization of mutual information is done community by community
-    MGH: In (2), McDaid et al. argued that the original NMI normalization was flawed and introduced a new (global) normalization by the max of entropy
-    MGH_LFK: This is a variant of the LFK method introduced in (2), with the same type of normalization but done globally instead of at each community
-
-    Results are checked to be similar to the C++ implementations by the authors of (2): https://github.com/aaronmcdaid/Overlapping-NMI
-
-    :param cover: set of set of nodes
-    :param coverRef:set of set of nodes
-    :param allNodes: if for some reason you want to take into account the fact that both your cover are partial coverages of a larger graph. Keep default unless you know what you're doing
-    :param variant: one of "LFK", "MGH", "MGH_LFK"
-    :return: an onmi score
-
-    :Reference:
-
-    1. Lancichinetti, A., Fortunato, S., & Kertesz, J. (2009). Detecting the overlapping and hierarchical community structure in complex networks. New Journal of Physics, 11(3), 033015.
-    2. McDaid, A. F., Greene, D., & Hurley, N. (2011). Normalized mutual information to evaluate overlapping community finding algorithms. arXiv preprint arXiv:1110.2515. Chicago
-
-    """
-    if (len(cover) == 0 and len(coverRef) != 0) or (len(cover) != 0 and len(coverRef) == 0):
-        return 0
-    if cover == coverRef:
-        return 1
-
-    if allNodes is None:
-        allNodes = {n for c in coverRef for n in c}
-        allNodes |= {n for c in cover for n in c}
-
-    if variant == "LFK":
-        HXY = __cover_conditional_entropy(cover, coverRef, allNodes, normalized=True)
-        HYX = __cover_conditional_entropy(coverRef, cover, allNodes, normalized=True)
-    else:
-        HXY = __cover_conditional_entropy(cover, coverRef, allNodes)
-        HYX = __cover_conditional_entropy(coverRef, cover, allNodes)
-
-    HX = __cover_entropy(cover, allNodes)
-    HY = __cover_entropy(coverRef, allNodes)
-
-    NMI = -10
-    if variant == "LFK":
-        NMI = 1 - 0.5 * (HXY + HYX)
-    elif variant == "MGH_LFK":
-        NMI = 1 - 0.5 * (HXY / HX + HYX / HY)
-    elif variant == "MGH":
-        IXY = 0.5 * (HX - HXY + HY - HYX)
-        NMI = IXY / (max(HX, HY))
-    if NMI < 0 or NMI > 1 or math.isnan(NMI):
-        print("NMI: %s  from %s %s %s %s " % (NMI, HXY, HYX, HX, HY))
-        raise Exception("incorrect NMI")
-    return NMI
 
 
 folders = ["mu01", "mu02", "mu03", "mu04", "mu05", "om2", "om3", "om4", "om5", "om6", "on10", "on20", "on30",
