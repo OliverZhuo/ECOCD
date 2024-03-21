@@ -248,7 +248,36 @@ def compute_permanence(G, community, neighbors, community_structure):
         nodes_permanence[i][1] = round(permanence, 4)
     return nodes_permanence
 
+def compute_permanence2(G, community, neighbors, community_structure):
+    nodes_permanence = list([0, 0.0] for i in range(len(community)))
+    for i in range(len(community)):
+        permanence = 0
+        # degree of node i
+        D_v = len(neighbors[community[i]])
+        # clustering coefficient
+        subgraph = G.induced_subgraph(community)
+        vs_index = 0
+        for vs_name in subgraph.vs["name"]:
+            if vs_name == community[i]:
+                break
+            vs_index += 1
+        c_in_v = subgraph.transitivity_local_undirected(vs_index, mode='zero')
+        # internal degree
+        I_v = len(set(neighbors[community[i]]).intersection(set(community))) - 1
+        # external connections
+        E_max = 0
+        for j in range(len(community_structure)):
+            int_community_j = list(map(int, community_structure[j]))
+            if len(set(neighbors[community[i]]).intersection(set(int_community_j))) != 0:
+                E_max += 1
+        E_max -= 1
 
+        if (E_max != 0) and (D_v != 0):
+            permanence = I_v / (E_max * D_v) + c_in_v - 1
+
+        nodes_permanence[i][0] = community[i]
+        nodes_permanence[i][1] = round(permanence, 4)
+    return nodes_permanence
 
 folders = ["mu01", "mu02", "mu03", "mu04", "mu05", "om2", "om3", "om4", "om5", "om6", "on10", "on20", "on30",
            "on40", "on50", "n1000", "n2000", "n3000", "n4000", "n5000", "n6000", "n7000", "n8000", "n9000", "n10000"]
