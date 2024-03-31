@@ -220,35 +220,8 @@ def compute_distance(G_igraph, diff_nodes, community):
     return nodes_distance
 
 
-def compute_permanence(G, community, neighbors, community_structure):
-    nodes_permanence = list([0, 0.0] for i in range(len(community)))
-    for i in range(len(community)):
-        permanence = 0
-        D_v = len(neighbors[community[i]])
-        subgraph = G.induced_subgraph(community)
-        vs_index = 0
-        for vs_name in subgraph.vs["name"]:
-            if vs_name == community[i]:
-                break
-            vs_index += 1
-        c_in_v = subgraph.transitivity_local_undirected(vs_index, mode='zero')
-        I_v = len(set(neighbors[community[i]]).intersection(set(community))) - 1
-        E_max = 0
-        for j in range(len(community_structure)):
-            int_community_j = list(map(int, community_structure[j]))
-            if j != i:
-                E = len(set(neighbors[community[i]]).intersection(set(int_community_j)))
-                if E > E_max:
-                    E_max = E
-        if E_max == 0:
-            E_max = 1
-        if (E_max != 0) and (D_v != 0):
-            permanence = I_v / (E_max * D_v) + c_in_v - 1
-        nodes_permanence[i][0] = community[i]
-        nodes_permanence[i][1] = round(permanence, 4)
-    return nodes_permanence
 
-def compute_permanence2(G, community, neighbors, community_structure):
+def compute_permanence(G, community, neighbors, community_structure):
     nodes_permanence = list([0, 0.0] for i in range(len(community)))
     for i in range(len(community)):
         permanence = 0
